@@ -1,0 +1,10 @@
+discord
+youtube_dl
+asyncio
+functools
+itertools
+math
+random
+async_timeout
+re
+os
