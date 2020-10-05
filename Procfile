@@ -1,1 +1,1 @@
-worker: python <birobotmod.py>
+worker: python birobotmod.py
