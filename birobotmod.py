@@ -165,7 +165,8 @@ class SongQueue(asyncio.Queue):
             return self._queue[item]
 
     def __iter__(self):
-        return self._queue.__iter__()
+        iterqueue=iter(self._queue)
+        return iterqueue
 
     def __len__(self):
         return self.qsize()
@@ -520,17 +521,10 @@ async def on_ready():
     print("Bot is ready")
 
 
-@client.event
-async def on_member_join(member):
-    channel = discord.utils.get(member.guild.channels, name='general')
-    guild = context.guild
-    await channel.send(f'Welcome {member.mention} to {guild.name}')
-
-
 @client.command(name='server')
-async def fetchServerInfo(context):
-    guild = context.guild
-    await context.send(f'Server Name: {guild.name}')
+async def fetchServerInfo(ctx):
+    guild = ctx.guild
+    await ctx.send(f'Server Name: {guild.name}')
 
 
 @commands.has_permissions(manage_guild=True)
@@ -580,4 +574,4 @@ async def unban(ctx, *, member):
             return
 
 
-client.run(os.environ['token'])
+client.run('NzYxMDg2MjE3ODQ3NzAxNTY0.X3Vexg.qEdCOVs-R2t9526pWIjre909zO0')
