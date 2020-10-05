@@ -1,7 +1,6 @@
 discord
 youtube_dl
 asyncio
-itertools
 math
 random
 async_timeout
