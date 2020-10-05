@@ -574,4 +574,4 @@ async def unban(ctx, *, member):
             return
 
 
-client.run('NzYxMDg2MjE3ODQ3NzAxNTY0.X3Vexg.qEdCOVs-R2t9526pWIjre909zO0')
+client.run(os.environ['token'])
