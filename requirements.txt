@@ -1,7 +1,6 @@
 discord
 youtube_dl
 asyncio
-functools
 itertools
 math
 random
