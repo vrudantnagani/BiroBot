@@ -2,3 +2,5 @@ discord
 youtube_dl
 asyncio
 async_timeout
+pynacl
+ffmpeg
