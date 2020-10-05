@@ -510,22 +510,6 @@ class Music(commands.Cog):
                 raise commands.CommandError('Bot is already in a voice channel.')    
 
 
-
-
-
-# Open the file for reading
-with open('token.txt') as fd:
-    # Iterate over the lines
-    for line in fd:
-
-        # Capture one-or-more characters of non-whitespace after the initial match
-        match = re.search(r'Token = (\S+)', line)
-
-        # Did we find a match?
-        if match:
-            # Yes, process it
-            token = match.group(1)
-
 client = commands.Bot(command_prefix='*')
 client.add_cog(Music(client))
 
