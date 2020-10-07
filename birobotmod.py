@@ -165,7 +165,7 @@ class SongQueue(asyncio.Queue):
             return self._queue[item]
 
     def __iter__(self):
-        return iter(self._queue)
+        return self._queue.__iter__()
 
     def __len__(self):
         return self.qsize()
@@ -322,7 +322,10 @@ class Music(commands.Cog):
         """Clears the queue and leaves the voice channel."""
 
         if not ctx.voice_state.voice:
-            return await ctx.send('Not connected to any voice channel.')
+            embed = discord.Embed(colour = discord.Colour.green())
+            embed.set_author(name='Not connected to any voice channel.')
+            await ctx.send(embed=embed)
+            #return await ctx.send('Not connected to any voice channel.')
 
         await ctx.voice_state.stop()
         del self.voice_states[ctx.guild.id]
@@ -333,10 +336,14 @@ class Music(commands.Cog):
         """Sets the volume of the player."""
 
         if not ctx.voice_state.is_playing:
-            return await ctx.send('Nothing being played at the moment.')
+            embed = discord.Embed(colour = discord.Colour.green())
+            embed.set_author(name='Nothing being played at the moment.')
+            await ctx.send(embed=embed)
 
         if(volume < 0 or volume > 100):
-            return await ctx.send('Volume must be between 0 and 100')
+            embed1 = discord.Embed(colour = discord.Colour.green())
+            embed1.set_author(name='Volume must be between 0 and 100')
+            await ctx.send(embed=embed1)
 
         else:
 
@@ -345,11 +352,14 @@ class Music(commands.Cog):
             source = ctx.guild.voice_client.source
 
             if not isinstance(source, discord.PCMVolumeTransformer):
-                return await ctx.send("This source doesn't support adjusting volume or "
-                                      "the interface to do so is not exposed.")
+                embed2 = discord.Embed(colour = discord.Colour.green())
+                embed2.set_author(name="This source doesn't support adjusting volume or the interface to do so is not exposed.")
+                await ctx.send(embed=embed2)
             
             source.volume = vol
-            await ctx.send(f'Volume of the player set to {volume}%')
+            embed3 = discord.Embed(colour = discord.Colour.green())
+            embed3.set_author(name=f'Volume of the player set to {volume}%')
+            await ctx.send(embed=embed3)
 
     @commands.command(name='now', aliases=['current', 'playing'])
     async def _now(self, ctx: commands.Context):
@@ -365,8 +375,9 @@ class Music(commands.Cog):
             ctx.voice_state.voice.pause()
             await ctx.message.add_reaction('⏯')
         else:
-            ctx.voice_state.voice.resume()
-            await ctx.message.add_reaction('⏯')
+            embed = discord.Embed(colour = discord.Colour.green())
+            embed.set_author(name='The player is already paused')
+            await ctx.send(embed=embed)
 
     @commands.command(name='resume')
     async def _resume(self, ctx: commands.Context):
@@ -374,7 +385,11 @@ class Music(commands.Cog):
 
         if ctx.voice_state.is_playing and ctx.voice_state.voice.is_paused():
             ctx.voice_state.voice.resume()
-            await ctx.message.add_reaction('⏯')
+            return await ctx.message.add_reaction('⏯')
+        elif ctx.voice_state.is_playing and ctx.voice_state.voice.is_playing():
+            embed = discord.Embed(colour = discord.Colour.green())
+            embed.set_author(name='The player is already playing')
+            await ctx.send(embed=embed)
 
     @commands.command(name = 'stop')
     async def _stop(self, ctx: commands.Context):
@@ -384,7 +399,9 @@ class Music(commands.Cog):
 
         if ctx.voice_state.is_playing:
             ctx.voice_state.voice.stop()
-            await ctx.send("Current playing song has been stopped and queue is cleared")
+            embed = discord.Embed(colour = discord.Colour.green())
+            embed.set_author(name='Current playing song has been stopped and queue is cleared')
+            await ctx.send(embed=embed)
             await ctx.message.add_reaction('⏹')
             #await client.change_presence(status=discord.Status.online,activity=discord.Activity(type=discord.ActivityType.listening, name="*help"))
 
@@ -400,7 +417,10 @@ class Music(commands.Cog):
         #await ctx.message.add_reaction('⏭')
         #ctx.voice_state.skip()
         if not ctx.voice_state.is_playing:
-            return await ctx.send('Not playing any music right now...')
+            ctx.voice_state.voice.stop()
+            embed = discord.Embed(colour = discord.Colour.green())
+            embed.set_author(name='Not playing any music right now...')
+            return await ctx.send(embed=embed)
 
         voter = ctx.message.author
         if voter == ctx.voice_state.current.requester:
@@ -471,7 +491,9 @@ class Music(commands.Cog):
         """
 
         if not ctx.voice_state.is_playing:
-            return await ctx.send('Nothing being played at the moment.')
+            embed = discord.Embed(colour = discord.Colour.green())
+            embed.set_author(name='Nothing being played at the moment.')
+            return await ctx.send(embed=embed)
 
         # Inverse boolean value to loop and unloop.
         ctx.voice_state.loop = not ctx.voice_state.loop
@@ -510,6 +532,22 @@ class Music(commands.Cog):
                 raise commands.CommandError('Bot is already in a voice channel.')    
 
 
+
+
+
+# Open the file for reading
+with open('token.txt') as fd:
+    # Iterate over the lines
+    for line in fd:
+
+        # Capture one-or-more characters of non-whitespace after the initial match
+        match = re.search(r'Token = (\S+)', line)
+
+        # Did we find a match?
+        if match:
+            # Yes, process it
+            token = match.group(1)
+
 client = commands.Bot(command_prefix='*')
 client.add_cog(Music(client))
 
@@ -520,16 +558,46 @@ async def on_ready():
     print("Bot is ready")
 
 
+@client.event
+async def on_member_join(member):
+    channel = discord.utils.get(member.guild.channels, name='general')
+    guild = context.guild
+    await channel.send(f'Welcome {member.mention} to {guild.name}')
+
+
 @client.command(name='server')
-async def fetchServerInfo(ctx):
-    guild = ctx.guild
-    await ctx.send(f'Server Name: {guild.name}')
+async def fetchServerInfo(context):
+    guild = context.guild
+    uid = guild.owner_id
+    owner = client.get_user(uid)
+
+    # Filter to the list, returns a list of bot-members
+    totbots = len([m for m in guild.members if m.bot])
+
+    totmem = guild.member_count - totbots
+    
+    embed = discord.Embed(colour = discord.Colour.green())
+    embed.set_author(name='SERVER DETAILS')
+    embed.add_field(name='Server Name', value=guild.name, inline=False)
+    embed.add_field(name='Server Owner', value=client.get_user(uid), inline=False)
+    embed.add_field(name='Total Members in the Server', value=guild.member_count, inline=False)
+    #embed.add_field(name='Total Human Members in the Server', value=totmem, inline=False)
+    #embed.add_field(name='Total Bot Members in the Server', value=totbots, inline=False)
+    await context.send(embed=embed)
+    #await context.send(f'Server Name: {guild.name}\nServer Owner: {username}\nTotal Members in the server: {totmem}')
 
 
-@commands.has_permissions(manage_guild=True)
+@commands.has_permissions(manage_guild=True, administrator=True)
 @client.command()
 async def clearmsg(ctx, amount=1):
     await ctx.channel.purge(limit=amount + 1)
+
+@clearmsg.error
+async def clearmsg_error(ctx, error):
+    if isinstance(error, commands.MissingPermissions):
+        embed = discord.Embed(colour = discord.Colour.green())
+        embed.set_author(name='Only Admin(s) or Owner of the server can use this command')
+        await ctx.send(embed=embed)
 
 client.remove_command('help')
 #Embeded help with list and details of commands
@@ -550,6 +618,17 @@ async def help(ctx):
 async def kick(ctx, member: discord.Member):
     await member.kick(reason=None)
     await ctx.send(f'{member.mention} has been kicked from the server!')
+    #embed = discord.Embed(colour = discord.Colour.green())
+    #embed.set_author(name=f'{member.mention} has been kicked from the server!')
+    #await ctx.send(embed=embed)
+
+@kick.error
+async def kick_error(ctx, error):
+    if isinstance(error, commands.MissingPermissions):
+        await ctx.send('Only Admin(s) or Owner of the server can use this command')
+        #embed = discord.Embed(colour = discord.Colour.green())
+        #embed.set_author(name='Only Admin(s) or Owner of the server can use this command')
+        #await ctx.send(embed=embed)
 
 
 @commands.has_permissions(manage_guild=True)
@@ -557,6 +636,17 @@ async def kick(ctx, member: discord.Member):
 async def ban(ctx, member: discord.Member):
     await member.ban(reason=None)
     await ctx.send(f'{member.mention} has been banned!')
+    #embed = discord.Embed(colour = discord.Colour.green())
+    #embed.set_author(name=f'{member.mention} has been banned!')
+    #await ctx.send(embed=embed)
+
+@ban.error
+async def ban_error(ctx, error):
+    if isinstance(error, commands.MissingPermissions):
+        await ctx.send('Only Admin(s) or Owner of the server can use this command')
+        #embed = discord.Embed(colour = discord.Colour.green())
+        #embed.set_author(name='Only Admin(s) or Owner of the server can use this command')
+        #await ctx.send(embed=embed)
 
 
 @commands.has_permissions(manage_guild=True)
@@ -569,8 +659,25 @@ async def unban(ctx, *, member):
 
         if (user.name, user.discriminator) == (member_name, member_discriminator):
             await ctx.guild.unban(user)
-            await ctx.send(f'{user.mention} has been unbanned!')
+            await ctx.send(f'{member.mention} has been unbanned!')
+            #embed = discord.Embed(colour = discord.Colour.green())
+            #embed.set_author(name=f'{member.mention} has been unbanned!')
+            #await ctx.send(embed=embed)
             return
+@unban.error
+async def unban_error(ctx, error):
+    if isinstance(error, commands.MissingPermissions):
+        await ctx.send('Only Admin(s) or Owner of the server can use this command')
+        #embed = discord.Embed(colour = discord.Colour.green())
+        #embed.set_author(name='Only Admin(s) or Owner of the server can use this command')
+        #await ctx.send(embed=embed)
+
+@client.event
+async def on_command_error(ctx, error):
+    if isinstance(error, commands.CommandNotFound):
+        embed = discord.Embed(colour = discord.Colour.green())
+        embed.set_author(name='No such command exist for me')
+        await ctx.send(embed=embed)
 
 
 client.run(os.environ['token'])
