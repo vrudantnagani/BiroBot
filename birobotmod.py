@@ -3,20 +3,22 @@ import functools
 import itertools
 import math
 import random
+
 from async_timeout import timeout
 
 import discord
 from discord.ext import commands, tasks
 from discord.utils import get
+intents = discord.Intents.default()
+intents.guilds = True
+intents.members = True
+
 
 import re
 import youtube_dl
 import os
 
 from random import choice
-
-client = commands.Bot(command_prefix='*')
-
 
 # Silence useless bug reports messages
 youtube_dl.utils.bug_reports_message = lambda: ''
@@ -165,7 +167,7 @@ class SongQueue(asyncio.Queue):
             return self._queue[item]
 
     def __iter__(self):
-        return self._queue.__iter__()
+        return iter(self._queue)
 
     def __len__(self):
         return self.qsize()
@@ -192,8 +194,9 @@ class VoiceState:
         self._loop = False
         self._volume = 0.5
         self.skip_votes = set()
+        self.voice_states = {}
 
-        self.audio_player = bot.loop.create_task(self.audio_player_task())
+        self.audio_player = bot.loop.create_task(self.audio_player_task(ctx))
 
     def __del__(self):
         self.audio_player.cancel()
@@ -218,7 +221,7 @@ class VoiceState:
     def is_playing(self):
         return self.voice and self.current
 
-    async def audio_player_task(self):
+    async def audio_player_task(self, ctx:commands.Context):
         while True:
             self.next.clear()
 
@@ -231,7 +234,8 @@ class VoiceState:
                     async with timeout(180):  # 3 minutes
                         self.current = await self.songs.get()
                 except asyncio.TimeoutError:
-                    self.bot.loop.create_task(self.stop())
+                    await ctx.invoke(self.bot.get_command('leavevc'))
+                    #self.bot.loop.create_task(self.stop())
                     return
 
             self.current.source.volume = self._volume
@@ -331,6 +335,12 @@ class Music(commands.Cog):
         del self.voice_states[ctx.guild.id]
         #await client.change_presence(status=discord.Status.online, activity=discord.Activity(type=discord.ActivityType.listening, name="*help"))
 
+    @commands.command(name='leavevc')
+    async def _leavevc(self, ctx: commands.Context):
+        """Clears the queue and leaves the voice channel."""
+        await ctx.voice_state.stop()
+        del self.voice_states[ctx.guild.id]
+    
     @commands.command(name='volume')
     async def _volume(self, ctx: commands.Context, *, volume: int):
         """Sets the volume of the player."""
@@ -484,7 +494,7 @@ class Music(commands.Cog):
         ctx.voice_state.songs.remove(index - 1)
         await ctx.message.add_reaction('✅')
 
-    @commands.command(name='loop')
+    @commands.command(name='loop', aliases=['repeat'])
     async def _loop(self, ctx: commands.Context):
         """Loops the currently playing song.
         Invoke this command again to unloop the song.
@@ -532,9 +542,6 @@ class Music(commands.Cog):
                 raise commands.CommandError('Bot is already in a voice channel.')    
 
 
-
-
-
 # Open the file for reading
 with open('token.txt') as fd:
     # Iterate over the lines
@@ -548,7 +555,7 @@ with open('token.txt') as fd:
             # Yes, process it
             token = match.group(1)
 
-client = commands.Bot(command_prefix='*')
+client = commands.Bot(command_prefix='*', case_insensitive=True, intents=intents)
 client.add_cog(Music(client))
 
 
@@ -560,35 +567,58 @@ async def on_ready():
 
 @client.event
 async def on_member_join(member):
-    channel = discord.utils.get(member.guild.channels, name='general')
-    guild = context.guild
-    await channel.send(f'Welcome {member.mention} to {guild.name}')
+    channel = discord.utils.get(member.guild.text_channels, name='welcome')
+    if channel:
+        embed = discord.Embed(description=f'Welcome to {member.guild.name} server')
+        embed.set_thumbnail(url=member.guild.icon_url)
+        embed.set_author(name=member.name, icon_url=member.avatar_url)
+        await channel.send(embed=embed)
+
+@client.event
+async def on_member_remove(member):
+    channel = discord.utils.get(member.guild.text_channels, name='goodbye')
+    if channel:
+        embed = discord.Embed(description=f'Goodbye!')
+        embed.set_thumbnail(url=member.guild.icon_url)
+        embed.set_author(name=member.name, icon_url=member.avatar_url)
+        await channel.send(embed=embed)
 
 
 @client.command(name='server')
-async def fetchServerInfo(context):
-    guild = context.guild
-    uid = guild.owner_id
+async def fetchServerInfo(ctx):
+    g = ctx.guild
+    uid = g.owner_id
     owner = client.get_user(uid)
-
-    # Filter to the list, returns a list of bot-members
-    totbots = len([m for m in guild.members if m.bot])
-
-    totmem = guild.member_count - totbots
+    all = len(g.members)
+    users = len([m for m in g.members if not m.bot])
+    bots = len([n for n in g.members if n.bot])
     
     embed = discord.Embed(colour = discord.Colour.green())
     embed.set_author(name='SERVER DETAILS')
-    embed.add_field(name='Server Name', value=guild.name, inline=False)
-    embed.add_field(name='Server Owner', value=client.get_user(uid), inline=False)
-    embed.add_field(name='Total Members in the Server', value=guild.member_count, inline=False)
-    #embed.add_field(name='Total Human Members in the Server', value=totmem, inline=False)
-    #embed.add_field(name='Total Bot Members in the Server', value=totbots, inline=False)
-    await context.send(embed=embed)
-    #await context.send(f'Server Name: {guild.name}\nServer Owner: {username}\nTotal Members in the server: {totmem}')
+    embed.add_field(name='Server Name', value=g.name, inline=False)
+    embed.add_field(name='Server Owner', value=owner, inline=False)
+    embed.add_field(name='Total Members in the Server', value=str(all), inline=False)
+    embed.add_field(name='Total Users in the Server', value=str(users), inline=False)
+    embed.add_field(name='Total Bot in the Server', value=str(bots), inline=False)
+    await ctx.send(embed=embed)
+
+@client.command(name="birostats")
+async def stats(ctx):
+    """"
+    A useful command that displays bot statistics
+    """
+    serverCount = len(client.guilds)
+    memberCount = len(set(client.get_all_members()))
+    embed = discord.Embed(description=f"I'm in")
+    embed.set_thumbnail(url=client.user.avatar_url)
+    embed.add_field(name="Total Guilds", value=str(serverCount))
+    embed.add_field(name="Total Members", value=str(memberCount))
+    embed.set_author(name="Biro Stats")
+    await ctx.send(embed=embed)
 
 
 @commands.has_permissions(manage_guild=True, administrator=True)
-@client.command()
+@client.command(name='clrm')
 async def clearmsg(ctx, amount=1):
     await ctx.channel.purge(limit=amount + 1)
 
@@ -606,10 +636,14 @@ async def help(ctx):
     embed = discord.Embed(colour = discord.Colour.green())
     embed.set_author(name='❯HELP: list of commands available')
     embed.add_field(name='*server', value='Information about the server', inline=False)
-    embed.add_field(name='*clearmsg x', value='Deletes last x messages from the channel. When nothing specified, last message is deleted', inline=False)
+    embed.add_field(name='*join', value='Biro joins the voice channel', inline=False)
     embed.add_field(name='*play songname/URL', value='Plays the song', inline=False)
     embed.add_field(name='*pause', value='Pause the currently playing song', inline=False)
+    embed.add_field(name='*resume', value='Resume the player', inline=False)
     embed.add_field(name='*stop', value='Stop playing music and clear the current queue', inline=False)
+    embed.add_field(name='*volume x', value='Adjust the volume to x%. By default song plays at 50% volume', inline=False)
+    embed.add_field(name='*skip', value='Skips the current playing song', inline=False)
+    embed.add_field(name='*leave/disconnect', value='Stops playing music and Biro leaves the voice channel', inline=False)
     await ctx.send(embed=embed)
 
 
@@ -680,4 +714,4 @@ async def on_command_error(ctx, error):
         await ctx.send(embed=embed)
 
 
-client.run(os.environ['token'])
+client.run(token)
